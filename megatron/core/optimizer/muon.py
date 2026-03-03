@@ -64,6 +64,12 @@ class TensorParallelMuon(OrthogonalizedOptimizer):
         if num_ns_steps < 1:
             raise ValueError(f"num_ns_steps must be at least 1, got {num_ns_steps}")
 
+        if torch.distributed.get_rank() == 0:
+            print(
+                f'Orthogonalizing grad with {num_ns_steps} steps, {coefficient_type} coefficient, '
+                f'{scale_mode} scale mode, extra_scale_factor={extra_scale_factor}',
+            )
+
         def scaled_orthogonalize_fn(
             grad: torch.Tensor,
             tp_group: torch.distributed.ProcessGroup,

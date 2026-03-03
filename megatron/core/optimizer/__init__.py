@@ -353,6 +353,18 @@ def _get_megatron_optimizer_based_on_param_groups(
                 "betas": (config.adam_beta1, config.adam_beta2),
                 "eps": config.adam_eps,
             }
+            from megatron.training.global_vars import get_args
+            args = get_args()
+            if 'muon' in args.optimizer:
+                muon_lr_multiplier = args.muon_lr_multiplier
+                log_single_rank(logger, logging.INFO, f'Setting up Muon-Adam optimizer with Adam LR multiplier {muon_lr_multiplier}')
+                kwargs = {
+                    "params": param_groups,
+                    "lr": muon_lr_multiplier * config.lr,
+                    "weight_decay": config.weight_decay,
+                    "betas": (config.adam_beta1, config.adam_beta2),
+                    "eps": config.adam_eps,
+                }
 
             # set Adam class and weight decay mode depending
             # on source of optimizer (Torch or TE/Apex)

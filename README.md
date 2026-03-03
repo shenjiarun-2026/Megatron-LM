@@ -22,19 +22,30 @@ Megatron-LM & Megatron Core
 # Clone the dev branch
 git clone -b dev https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
-
-# Install from source with dev dependencies (includes transformer_engine)
-pip install -e .[mlm,dev]
+git checkout dev
+git checkout 7d1c016856bb457ae2ff88ad502b8ea9aa3d31fa
+pip install --no-build-isolation .[mlm,dev]
+cd ../Emerging-Optimizers
+git checkout 4d84ccadc2bb2ef1f9d346db443562bb44255070
+cp -r emerging_optimizers ../Megatron-LM
+cd -
 ```
 
 <details>
 <summary>Table of Contents</summary>
 
 **Getting Started**
-- [⚡ Quick Start](#-quick-start)
-- [🧠 Dev Branch Philosophy](#-dev-branch-philosophy)
-- [📊 Performance & Benchmarking](#-performance--benchmarking)
-- [👥 Community & Support](#-community--support)
+- [Megatron-LM \& Megatron Core](#megatron-lm--megatron-core)
+  - [⚡ Quickstart](#-quickstart)
+  - [Dev Branch Philosophy](#dev-branch-philosophy)
+    - [Fast Iteration](#fast-iteration)
+    - [Feature Lifecycle (Coming Soon)](#feature-lifecycle-coming-soon)
+    - [Stability Expectations](#stability-expectations)
+  - [Performance \& Benchmarking](#performance--benchmarking)
+  - [Community \& Support](#community--support)
+    - [Getting Help](#getting-help)
+    - [Contributing](#contributing)
+    - [Citation](#citation)
 
 **For Complete Documentation** → [Main Branch](https://github.com/NVIDIA/Megatron-LM) | [Official Docs](https://docs.nvidia.com/Megatron-Core/)
 
