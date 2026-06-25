@@ -2248,12 +2248,52 @@ def _add_regularization_args(parser):
     group.add_argument('--muon-tp-mode', type=str, default='blockwise',
                        choices=['blockwise', 'duplicated', 'distributed'],
                        help='How to perform NS calculation for tensor model parallel weights')
+    group.add_argument('--muon-config-mode', type=str, default='blockwise',
+                       choices=['blockwise', 'snecv', 'full_update'],
+                       help='Select which Muon config preset to use.')
     group.add_argument('--muon-extra-scale-factor', type=float, default=1.0,
                        help='Additional scale factor for the muon update')
+    group.add_argument('--muon-lr-multiplier', type=float, default=1.0,
+                       help='Multiplier applied to the Muon learning rate.')
     group.add_argument('--muon-scalar-optimizer', type=str, default='adam',
                        choices=['adam', 'lion'],
                        help='Optimizer for scalar parameters (embeddings, biases, norms) '
                        'when using muon. Defaults to adam.')
+    group.add_argument('--muon-snecv-z-low', type=float, default=1.0,
+                       help='Lower z-score threshold for SNECV-Muon behavior.')
+    group.add_argument('--muon-snecv-z-high', type=float, default=3.0,
+                       help='Upper z-score threshold for SNECV-Muon behavior.')
+    group.add_argument('--muon-snecv-beta', type=float, default=0.98,
+                       help='Beta value for SNECV-Muon mean and variance accumulation.')
+    group.add_argument('--muon-snecv-eps', type=float, default=1e-6,
+                       help='Epsilon value for SNECV-Muon stability.')
+    group.add_argument('--muon-snecv-warmup-steps', type=int, default=200,
+                       help='Number of warmup steps for SNECV-Muon.')
+    group.add_argument('--muon-snecv-pressure-gamma', type=float, default=0.95,
+                       help='Gamma value for SNECV-Muon pressure accumulation.')
+    group.add_argument('--muon-snecv-pressure-alpha', type=float, default=1.0,
+                       help='Alpha value for SNECV-Muon pressure scaling.')
+    group.add_argument('--muon-snecv-pressure-threshold-h', type=float, default=4.0,
+                       help='Pressure threshold h for SNECV-Muon activation.')
+    group.add_argument('--muon-snecv-pressure-reset-factor', type=float, default=0.0,
+                       help='Reset factor for SNECV-Muon pressure.')
+    group.add_argument('--muon-snecv-local-lr-gamma', type=float, default=0.5,
+                       help='Gamma value for SNECV-Muon local learning rate scaling.')
+    group.add_argument('--muon-use-smooth-local-lr-decay', action='store_true', default=True,
+                       help='If set, use smooth decay for SNECV-Muon local learning rate.')
+    group.add_argument('--no-muon-use-smooth-local-lr-decay', action='store_false',
+                       dest='muon_use_smooth_local_lr_decay',
+                       help='Disable smooth decay for SNECV-Muon local learning rate.')
+    group.add_argument('--muon-snecv-monitor-signal', type=str, default='energy_cv',
+                       help='Monitor signal used by AdaptiveTensorParallelMuon to decide full updates.')
+    group.add_argument('--muon-snecv-monitor-sketch-q', type=int, default=4,
+                       help='Sketch/probe dimension for sketch-based SNECV-Muon monitor signals.')
+    group.add_argument('--muon-snecv-monitor-power-iters', type=int, default=2,
+                       help='Power-iteration count for spectral-norm-based SNECV-Muon monitor signals.')
+    group.add_argument('--muon-snecv-stats-log-interval', type=int, default=1,
+                       help='Logging interval for SNECV-Muon statistics.')
+    group.add_argument('--muon-comm-budget-rho', type=float, default=None,
+                       help='Communication budget rho for SNECV-Muon. Defaults to unlimited.')
     group.add_argument('--lion-beta1', type=float, default=0.95,
                        help='First beta coefficient for Lion optimizer '
                        '(used in sign update). Default: 0.95.')

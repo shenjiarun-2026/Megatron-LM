@@ -137,6 +137,9 @@ def optim_state_to_sharding_state(
         for state_key, param in param_state.items():
             if state_key in exclude_keys:
                 continue
+            # Skip non-tensor optimizer states (e.g., boolean flags in fused optimizers)
+            if not isinstance(param, torch.Tensor):
+                continue
             if param_id in id_to_sharded_param_map:
                 sharded_state[param_id][state_key] = make_sharded_optimizer_tensor(
                     id_to_sharded_param_map[param_id], param, prefix=f'optimizer.state.{state_key}'

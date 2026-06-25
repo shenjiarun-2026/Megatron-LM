@@ -3,6 +3,8 @@ import sys
 import json
 import argparse
 
+from tqdm import tqdm
+
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir))
 )
@@ -58,7 +60,7 @@ def main():
     args = get_args()
 
     prefixes = set()
-    for basename in os.listdir(args.input):
+    for basename in tqdm(os.listdir(args.input)):
         prefix, ext = os.path.splitext(basename)
 
         if prefix in prefixes:
@@ -75,7 +77,7 @@ def main():
         prefixes.add(prefix)
 
     builder = None
-    for prefix in sorted(prefixes):
+    for prefix in tqdm(sorted(prefixes)):
         if builder is None:
             dataset = IndexedDataset(os.path.join(args.input, prefix), multimodal=args.multimodal)
             builder = IndexedDatasetBuilder(

@@ -282,8 +282,14 @@ class OptimizerConfig:
     muon_tp_mode: str = "blockwise"
     """How to perform NS calculation for tensor parallel weights. Defaults to "blockwise"."""
 
+    muon_config_mode: str = "blockwise"
+    """Select which Muon config preset to use. Defaults to "blockwise"."""
+
     muon_extra_scale_factor: float = 1.0
     """Additional scale factor for the muon update."""
+
+    muon_lr_multiplier: float = 1.0
+    """Multiplier applied to the Muon learning rate."""
 
     muon_scalar_optimizer: str = 'adam'
     """Optimizer for nonlinear parameters (embeddings, biases, norms) when using muon.
@@ -296,6 +302,58 @@ class OptimizerConfig:
     lion_beta2: float = 0.98
     """Second beta coefficient for Lion optimizer (used in momentum EMA update).
     Defaults to 0.98."""
+
+    #######################
+    # SNECV-Muon optimizer
+    #######################
+
+    muon_snecv_z_low: float = 1.0
+    """Lower z-score threshold for SNECV-Muon behavior."""
+
+    muon_snecv_z_high: float = 3.0
+    """Upper z-score threshold for SNECV-Muon behavior."""
+
+    muon_snecv_beta: float = 0.98
+    """Beta value for SNECV-Muon mean and variance accumulation."""
+
+    muon_snecv_eps: float = 1e-6
+    """eps value for SNECV-Muon stability."""
+
+    muon_snecv_warmup_steps: int = 200
+    """Number of warmup steps for SNECV-Muon."""
+
+    muon_snecv_pressure_gamma: float = 0.95
+    """Gamma value for SNECV-Muon pressure accumulation."""
+
+    muon_snecv_pressure_alpha: float = 1.0
+    """Alpha value for SNECV-Muon pressure scaling."""
+
+    muon_snecv_pressure_threshold_h: float = 4.0
+    """Pressure threshold h for SNECV-Muon activation."""
+
+    muon_snecv_pressure_reset_factor: float = 0.0
+    """Reset factor for SNECV-Muon pressure."""
+
+    muon_snecv_local_lr_gamma: float = 0.5
+    """Gamma value for SNECV-Muon local learning rate scaling."""
+
+    muon_use_smooth_local_lr_decay: bool = True
+    """If true, use smooth decay for SNECV-Muon local learning rate."""
+
+    muon_snecv_monitor_signal: str = "energy_cv"
+    """Monitor signal used by AdaptiveTensorParallelMuon to decide full updates."""
+
+    muon_snecv_monitor_sketch_q: int = 4
+    """Sketch/probe dimension for sketch-based SNECV-Muon monitor signals."""
+
+    muon_snecv_monitor_power_iters: int = 2
+    """Power-iteration count for spectral-norm-based SNECV-Muon monitor signals."""
+
+    muon_snecv_stats_log_interval: int = 1
+    """Logging interval for SNECV-Muon statistics."""
+
+    muon_comm_budget_rho: Optional[float] = None
+    """Communication budget rho for SNECV-Muon (None means unlimited)."""
 
     #######################
     # Distributed optimizer
