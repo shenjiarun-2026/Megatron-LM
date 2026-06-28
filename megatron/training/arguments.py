@@ -2249,7 +2249,7 @@ def _add_regularization_args(parser):
                        choices=['blockwise', 'duplicated', 'distributed'],
                        help='How to perform NS calculation for tensor model parallel weights')
     group.add_argument('--muon-config-mode', type=str, default='blockwise',
-                       choices=['blockwise', 'snecv', 'full_update'],
+                       choices=['blockwise', 'muonbp', 'snecv', 'muon'],
                        help='Select which Muon config preset to use.')
     group.add_argument('--muon-extra-scale-factor', type=float, default=1.0,
                        help='Additional scale factor for the muon update')
@@ -2294,6 +2294,9 @@ def _add_regularization_args(parser):
                        help='Logging interval for SNECV-Muon statistics.')
     group.add_argument('--muon-comm-budget-rho', type=float, default=None,
                        help='Communication budget rho for SNECV-Muon. Defaults to unlimited.')
+    group.add_argument('--muonbp-full-update-interval', type=int, default=100,
+                       help='Full update interval for MuonBP config mode. A value of 1 '
+                       'makes every MuonBP step use full distributed Muon.')
     group.add_argument('--lion-beta1', type=float, default=0.95,
                        help='First beta coefficient for Lion optimizer '
                        '(used in sign update). Default: 0.95.')

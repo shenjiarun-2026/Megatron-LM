@@ -355,6 +355,9 @@ class OptimizerConfig:
     muon_comm_budget_rho: Optional[float] = None
     """Communication budget rho for SNECV-Muon (None means unlimited)."""
 
+    muonbp_full_update_interval: int = 100
+    """Full update interval for MuonBP config mode."""
+
     #######################
     # Distributed optimizer
     #######################

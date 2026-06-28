@@ -263,6 +263,7 @@ class AdaptiveTensorParallelMuon(OrthogonalizedOptimizer):
         # optional communication budget for full orth ratio
         comm_budget_rho: float | None = None,
         snecv_stats_log_interval: int = 0,
+        muonbp_full_update_interval: int | None = None,
     ) -> None:
         if num_ns_steps < 1:
             raise ValueError(f"num_ns_steps must be at least 1, got {num_ns_steps}")
@@ -327,6 +328,11 @@ class AdaptiveTensorParallelMuon(OrthogonalizedOptimizer):
             raise ValueError(
                 f"snecv_stats_log_interval must be >= 0, got {snecv_stats_log_interval}"
             )
+        if muonbp_full_update_interval is not None and muonbp_full_update_interval < 1:
+            raise ValueError(
+                "muonbp_full_update_interval must be >= 1 when provided, "
+                f"got {muonbp_full_update_interval}"
+            )
 
         self.pg_collection = pg_collection
         self.mode = mode
@@ -356,6 +362,7 @@ class AdaptiveTensorParallelMuon(OrthogonalizedOptimizer):
         self.snecv_monitor_sketch_q = snecv_monitor_sketch_q
         self.snecv_monitor_power_iters = snecv_monitor_power_iters
         self.snecv_stats_log_interval = snecv_stats_log_interval
+        self.muonbp_full_update_interval = muonbp_full_update_interval
 
         # communication budget rho
         self.comm_budget_rho = comm_budget_rho
@@ -767,10 +774,13 @@ class AdaptiveTensorParallelMuon(OrthogonalizedOptimizer):
         decision_threshold = tau_high
 
         if can_switch:
-            if step >= self.snecv_warmup_steps:
+            if self.muonbp_full_update_interval is not None:
+                use_full = step % self.muonbp_full_update_interval == 0
+                full_reason = "muonbp_interval" if use_full else None
+            elif step >= self.snecv_warmup_steps:
                 raw_cv, _, _, z = self._snecv_update_and_score(p, grad, tp_group)
                 decision_threshold = tau_high
-            
+
                 local_lr_scale = self._get_local_lr_scale(z, tau_high)
                 if z >= tau_high:
                     use_full = True
@@ -1038,6 +1048,7 @@ def get_megatron_muon_optimizer(
         "snecv_monitor_power_iters": 2,
         "snecv_stats_log_interval": getattr(config, "muon_snecv_stats_log_interval", 1),
         "comm_budget_rho": None,
+        "muonbp_full_update_interval": None,
     }
 
     # 把 muon_config_mode 仅当作 config 选择器，不传给构造函数
@@ -1071,9 +1082,37 @@ def get_megatron_muon_optimizer(
             "snecv_monitor_sketch_q": 1,
             "snecv_monitor_power_iters": 0,
             "comm_budget_rho": None,
+            "muonbp_full_update_interval": None,
         })
 
-    # Config 2: SNECV-Muon  (monitor sweep 实验)
+    # Config 2: MuonBP
+    # 目标: 每隔 full_update_interval 步做一次 full distributed Muon，其他步做 blockwise Muon
+    #       full_update_interval=1 时等价于每步 full Muon。
+    #
+    # 实现原理:
+    #   AdaptiveTensorParallelMuon 内部优先检查 muonbp_full_update_interval；
+    #   若设置该值，则直接用 step % interval == 0 决定是否 full，完全跳过
+    #   SNECV monitor / z-score / pressure / budget 逻辑。
+    elif muon_config_mode == "muonbp":
+        muon_kwargs.update({
+            "lr_block": getattr(config, "muon_lr_block", config.lr),
+            "lr_full": getattr(config, "muon_lr_full", config.lr),
+            "snecv_warmup_steps": 999_999_999,
+            "snecv_z_low": 1.0,
+            "snecv_z_high": 9999.0,
+            "snecv_pressure_gamma": 0.0,
+            "snecv_pressure_threshold_h": 9999.0,
+            "snecv_local_lr_gamma": 0.0,
+            "snecv_monitor_signal": "energy_cv",
+            "snecv_monitor_sketch_q": 1,
+            "snecv_monitor_power_iters": 0,
+            "comm_budget_rho": None,
+            "muonbp_full_update_interval": getattr(
+                config, "muonbp_full_update_interval", 100
+            ),
+        })
+
+    # Config 3: SNECV-Muon  (monitor sweep 实验)
     # 目标: 自适应切换 blockwise / full，跑不同 monitor signal 的 sweep
     #
     # 实现原理:
@@ -1118,38 +1157,33 @@ def get_megatron_muon_optimizer(
             "comm_budget_rho": getattr(config, "muon_comm_budget_rho", None),
         })
 
-    # Config 3: 伪装成 Original (Full Update) Muon 的基线
-    # 目标: 每步都做 full distributed Newton-Schulz iteration + 全通信
-    #       等价于原始 Muon 的行为
+    # Config 4: Original / Full Update Muon baseline
+    # 目标: 每步都做 full distributed Newton-Schulz iteration + 全通信。
     #
-    # 实现原理 (利用 pressure 机制让 use_full 每步为 True):
-    #   warmup_steps=0        → 第 1 步就进入 SNECV 评分块
-    #   z_low=0.0, z_high=999 → z-score 几乎不可能 >=999，走 pressure 路径
-    #   pressure_gamma=1.0    → pressure 永不衰减
-    #   pressure_alpha=0.0    → medium band 内每步固定加 1.0
-    #   pressure_threshold_h=1e-5 → 第 1 步 pressure=1.0 即远超阈值 → full
-    #   pressure_reset_factor=1.0 → full 触发后 pressure 不重置
-    #   → 此后 pressure 只增不减，每步都满足 >= 1e-5 → 永远 use_full=True
-    #
-    # 注意: 每步有一次轻量的 energy_cv all_reduce (2 个 scalar)，
-    #       相比 distributed NS 的 allgather/reduce_scatter 可忽略不计。
-    else:
+    # 实现原理:
+    #   复用 MuonBP 的周期 full-update 路径，并固定 interval=1；
+    #   因此每一步都是 full update，同时不会额外计算 SNECV monitor。
+    elif muon_config_mode == "muon":
         muon_kwargs.update({
             "lr_block": config.lr,
             "lr_full": config.lr,
-            "snecv_warmup_steps": 0,
-            "snecv_z_low": 0.0,
-            "snecv_z_high": 999.0,
-            "snecv_pressure_gamma": 1.0,           # 不衰减
-            "snecv_pressure_alpha": 0.0,            # 每步固定 +1.0
-            "snecv_pressure_threshold_h": 1e-5,     # 极小，第 1 步即触发
-            "snecv_pressure_reset_factor": 1.0,     # 触发后不重置
-            "snecv_local_lr_gamma": 0.0,            # 无 LR 衰减（反正 use_full=True 时不用）
-            "snecv_monitor_signal": "energy_cv",    # 最轻量 monitor
+            "snecv_warmup_steps": 999_999_999,
+            "snecv_z_low": 1.0,
+            "snecv_z_high": 9999.0,
+            "snecv_pressure_gamma": 0.0,
+            "snecv_pressure_threshold_h": 9999.0,
+            "snecv_local_lr_gamma": 0.0,
+            "snecv_monitor_signal": "energy_cv",
             "snecv_monitor_sketch_q": 1,
             "snecv_monitor_power_iters": 0,
-            "comm_budget_rho": None,                # 禁用 budget 自适应
+            "comm_budget_rho": None,
+            "muonbp_full_update_interval": 1,
         })
+    else:
+        raise ValueError(
+            "muon_config_mode must be one of {'blockwise', 'muonbp', 'snecv', 'muon'}, "
+            f"got {muon_config_mode!r}"
+        )
 
     # freezing nonlinear params and get param groups for muon
     for param in nonlinear_params:
